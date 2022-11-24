@@ -4,178 +4,209 @@ import {
   StyleSheet,
   Text,
   View,
-  FlatList,
-  TextInput,
-  Keyboard,
-  TouchableOpacity,
+  Image,
+  TouchableHighlight,
+  ScrollView,
 } from 'react-native';
-import Slider from '@react-native-community/slider';
-import Tts from 'react-native-tts';
+import Voice from '@react-native-community/voice';
  
 const App = () => {
-  const [voices, setVoices] = useState([]);
-  const [ttsStatus, setTtsStatus] = useState('initiliazing');
-  const [selectedVoice, setSelectedVoice] = useState(null);
-  const [speechRate, setSpeechRate] = useState(0.5);
-  const [speechPitch, setSpeechPitch] = useState(1);
-  const [
-    text,
-    setText
-  ] = useState('Hello React');
+  const [pitch, setPitch] = useState('');
+  const [error, setError] = useState('');
+  const [end, setEnd] = useState('');
+  const [started, setStarted] = useState('');
+  const [results, setResults] = useState([]);
+  const [partialResults, setPartialResults] = useState([]);
  
   useEffect(() => {
-    Tts.addEventListener(
-      'tts-start',
-      (_event) => setTtsStatus('started')
-    );
-    Tts.addEventListener(
-      'tts-finish',
-      (_event) => setTtsStatus('finished')
-    );
-    Tts.addEventListener(
-      'tts-cancel',
-      (_event) => setTtsStatus('cancelled')
-    );
-    Tts.setDefaultRate(speechRate);
-    Tts.setDefaultPitch(speechPitch);
-    Tts.getInitStatus().then(initTts);
+    //Setting callbacks for the process status
+    Voice.onSpeechStart = onSpeechStart;
+    Voice.onSpeechEnd = onSpeechEnd;
+    Voice.onSpeechError = onSpeechError;
+    Voice.onSpeechResults = onSpeechResults;
+    Voice.onSpeechPartialResults = onSpeechPartialResults;
+    Voice.onSpeechVolumeChanged = onSpeechVolumeChanged;
+ 
     return () => {
-      Tts.removeEventListener(
-        'tts-start',
-        (_event) => setTtsStatus('started')
-      );
-      Tts.removeEventListener(
-        'tts-finish',
-        (_event) => setTtsStatus('finished'),
-      );
-      Tts.removeEventListener(
-        'tts-cancel',
-        (_event) => setTtsStatus('cancelled'),
-      );
+      //destroy the process after switching the screen
+      Voice.destroy().then(Voice.removeAllListeners);
     };
   }, []);
  
-  const initTts = async () => {
-    const voices = await Tts.voices();
-    const availableVoices = voices
-      .filter((v) => !v.networkConnectionRequired && !v.notInstalled)
-      .map((v) => {
-        return {id: v.id, name: v.name, language: v.language};
-      });
-    let selectedVoice = null;
-    if (voices && voices.length > 0) {
-      selectedVoice = voices[0].id;
-      try {
-        await Tts.setDefaultLanguage(voices[0].language);
-      } catch (err) {
-        console.log(`setDefaultLanguage error `, err);
-      }
-      await Tts.setDefaultVoice(voices[0].id);
-      setVoices(availableVoices);
-      setSelectedVoice(selectedVoice);
-      setTtsStatus('initialized');
-    } else {
-      setTtsStatus('initialized');
-    }
+  const onSpeechStart = (e) => {
+    //Invoked when .start() is called without error
+    console.log('onSpeechStart: ', e);
+    setStarted('√');
   };
  
-  const readText = async () => {
-    Tts.stop();
-    Tts.speak(text);
+  const onSpeechEnd = (e) => {
+    //Invoked when SpeechRecognizer stops recognition
+    console.log('onSpeechEnd: ', e);
+    setEnd('√');
   };
  
-  const updateSpeechRate = async (rate) => {
-    await Tts.setDefaultRate(rate);
-    setSpeechRate(rate);
+  const onSpeechError = (e) => {
+    //Invoked when an error occurs.
+    console.log('onSpeechError: ', e);
+    setError(JSON.stringify(e.error));
   };
  
-  const updateSpeechPitch = async (rate) => {
-    await Tts.setDefaultPitch(rate);
-    setSpeechPitch(rate);
+  const onSpeechResults = (e) => {
+    //Invoked when SpeechRecognizer is finished recognizing
+    console.log('onSpeechResults: ', e);
+    setResults(e.value);
   };
  
-  const onVoicePress = async (voice) => {
+  const onSpeechPartialResults = (e) => {
+    //Invoked when any results are computed
+    console.log('onSpeechPartialResults: ', e);
+    setPartialResults(e.value);
+  };
+ 
+  const onSpeechVolumeChanged = (e) => {
+    //Invoked when pitch that is recognized changed
+    console.log('onSpeechVolumeChanged: ', e);
+    setPitch(e.value);
+  };
+ 
+  const startRecognizing = async () => {
+    //Starts listening for speech for a specific locale
     try {
-      await Tts.setDefaultLanguage(voice.language);
-    } catch (err) {
- 
-      console.log(`setDefaultLanguage error `, err);
+      await Voice.start('en-US');
+      setPitch('');
+      setError('');
+      setStarted('');
+      setResults([]);
+      setPartialResults([]);
+      setEnd('');
+    } catch (e) {
+      //eslint-disable-next-line
+      console.error(e);
     }
-    await Tts.setDefaultVoice(voice.id);
-    setSelectedVoice(voice.id);
   };
  
-  const renderVoiceItem = ({item}) => {
-    return (
-      <TouchableOpacity
-        style={{
-          backgroundColor: selectedVoice === item.id ? 
-          '#DDA0DD' : '#5F9EA0',
-        }}
-        onPress={() => onVoicePress(item)}>
-        <Text style={styles.buttonTextStyle}>
-          {`${item.language} - ${item.name || item.id}`}
-        </Text>
-      </TouchableOpacity>
-    );
+  const stopRecognizing = async () => {
+    //Stops listening for speech
+    try {
+      await Voice.stop();
+    } catch (e) {
+      //eslint-disable-next-line
+      console.error(e);
+    }
+  };
+ 
+  const cancelRecognizing = async () => {
+    //Cancels the speech recognition
+    try {
+      await Voice.cancel();
+    } catch (e) {
+      //eslint-disable-next-line
+      console.error(e);
+    }
+  };
+ 
+  const destroyRecognizer = async () => {
+    //Destroys the current SpeechRecognizer instance
+    try {
+      await Voice.destroy();
+      setPitch('');
+      setError('');
+      setStarted('');
+      setResults([]);
+      setPartialResults([]);
+      setEnd('');
+    } catch (e) {
+      //eslint-disable-next-line
+      console.error(e);
+    }
   };
  
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.container}>
         <Text style={styles.titleText}>
-          Text to Speech Conversion in React Native
+          Speech to Text Conversion in React Native |
+          Voice Recognition
         </Text>
-        <View style={styles.sliderContainer}>
-          <Text style={styles.sliderLabel}>
-            {`Speed: ${speechRate.toFixed(2)}`}
+        <Text style={styles.textStyle}>
+          Press mic to start Recognition
+        </Text>
+        <View style={styles.headerContainer}>
+          <Text style={styles.textWithSpaceStyle}>
+            {`Started: ${started}`}
           </Text>
-          <Slider
-            style={styles.slider}
-            minimumValue={0.01}
-            maximumValue={0.99}
-            value={speechRate}
-            onSlidingComplete={updateSpeechRate}
-          />
+          <Text style={styles.textWithSpaceStyle}>
+            {`End: ${end}`}
+          </Text>
         </View>
-        <View style={styles.sliderContainer}>
-          <Text style={styles.sliderLabel}>
-            {`Pitch: ${speechPitch.toFixed(2)}`}
+        <View style={styles.headerContainer}>
+          <Text style={styles.textWithSpaceStyle}>
+            {`Pitch: \n ${pitch}`}
           </Text>
-          <Slider
-            style={styles.slider}
-            minimumValue={0.5}
-            maximumValue={2}
-            value={speechPitch}
-            onSlidingComplete={updateSpeechPitch}
-          />
+          <Text style={styles.textWithSpaceStyle}>
+            {`Error: \n ${error}`}
+          </Text>
         </View>
-        <Text style={styles.sliderContainer}>
-          {`Selected Voice: ${selectedVoice || ''}`}
+        <TouchableHighlight onPress={startRecognizing}>
+          <Image
+            style={styles.imageButton}
+            source={{
+              uri:
+                'https://raw.githubusercontent.com/AboutReact/sampleresource/master/microphone.png',
+            }}
+          />
+        </TouchableHighlight>
+        <Text style={styles.textStyle}>
+          Partial Results
         </Text>
-        <TextInput
-          style={styles.textInput}
-          onChangeText={(text) => setText(text)}
-          value={text}
-          onSubmitEditing={Keyboard.dismiss}
-        />
-        <TouchableOpacity
-          style={styles.buttonStyle}
-          onPress={readText}>
-          <Text style={styles.buttonTextStyle}>
-            Click to Read Text ({`Status: ${ttsStatus || ''}`})
-          </Text>
-        </TouchableOpacity>
-        <Text style={styles.sliderLabel}>
-          Select the Voice from below
+        <ScrollView>
+          {partialResults.map((result, index) => {
+            return (
+              <Text
+                key={`partial-result-${index}`}
+                style={styles.textStyle}>
+                {result}
+              </Text>
+            );
+          })}
+        </ScrollView>
+        <Text style={styles.textStyle}>
+          Results
         </Text>
-        <FlatList
-          style={{width: '100%', marginTop: 5}}
-          keyExtractor={(item) => item.id}
-          renderItem={renderVoiceItem}
-          extraData={selectedVoice}
-          data={voices}
-        />
+        <ScrollView style={{marginBottom: 42}}>
+          {results.map((result, index) => {
+            return (
+              <Text
+                key={`result-${index}`}
+                style={styles.textStyle}>
+                {result}
+              </Text>
+            );
+          })}
+        </ScrollView>
+        <View style={styles.horizontalView}>
+          <TouchableHighlight
+            onPress={stopRecognizing}
+            style={styles.buttonStyle}>
+            <Text style={styles.buttonTextStyle}>
+              Stop
+            </Text>
+          </TouchableHighlight>
+          <TouchableHighlight
+            onPress={cancelRecognizing}
+            style={styles.buttonStyle}>
+            <Text style={styles.buttonTextStyle}>
+              Cancel
+            </Text>
+          </TouchableHighlight>
+          <TouchableHighlight
+            onPress={destroyRecognizer}
+            style={styles.buttonStyle}>
+            <Text style={styles.buttonTextStyle}>
+              Destroy
+            </Text>
+          </TouchableHighlight>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -187,7 +218,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     flexDirection: 'column',
+    alignItems: 'center',
     padding: 5,
+  },
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
   },
   titleText: {
     fontSize: 22,
@@ -195,35 +232,34 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   buttonStyle: {
+    flex: 1,
     justifyContent: 'center',
     marginTop: 15,
     padding: 10,
     backgroundColor: '#8ad24e',
+    marginRight: 2,
+    marginLeft: 2,
   },
   buttonTextStyle: {
     color: '#fff',
     textAlign: 'center',
   },
-  sliderContainer: {
+  horizontalView: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: 300,
-    padding: 5,
+    position: 'absolute',
+    bottom: 0,
   },
-  sliderLabel: {
+  textStyle: {
     textAlign: 'center',
-    marginRight: 20,
+    padding: 12,
   },
-  slider: {
+  imageButton: {
+    width: 50,
+    height: 50,
+  },
+  textWithSpaceStyle: {
     flex: 1,
-  },
-  textInput: {
-    borderColor: 'gray',
-    borderWidth: 1,
-    color: 'black',
-    width: '100%',
     textAlign: 'center',
-    height: 40,
+    color: '#B0171F',
   },
 });
