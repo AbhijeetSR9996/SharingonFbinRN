@@ -2,32 +2,74 @@ import React, {useState} from 'react';
 import {
   SafeAreaView,
   StyleSheet,
-  Text,
   View,
+  Text,
   TouchableOpacity,
+  TextInput,
+  Linking,
 } from 'react-native';
-import Torch from 'react-native-torch';
  
 const App = () => {
-  const [isTorchOn, setIsTorchOn] = useState(false);
+  const [facebookShareURL, setFacebookShareURL] = useState(
+    'https://aboutreact.com',
+  );
+  const [postContent, setPostContent] = useState(
+    'Hello, This is a testing of facebook share content',
+  );
  
-  const handlePress = () => {
-    Torch.switchState(!isTorchOn);
-    setIsTorchOn(!isTorchOn);
+  const postOnFacebook = () => {
+    let facebookParameters = [];
+    if (facebookShareURL)
+      facebookParameters.push('u=' + encodeURI(facebookShareURL));
+    if (postContent)
+      facebookParameters.push('quote=' + encodeURI(postContent));
+    const url =
+      'https://www.facebook.com/sharer/sharer.php?'
+       + facebookParameters.join('&');
+ 
+    Linking.openURL(url)
+      .then((data) => {
+        alert('Facebook Opened');
+      })
+      .catch(() => {
+        alert('Something went wrong');
+      });
   };
  
   return (
     <SafeAreaView style={styles.container}>
-      <View>
+      <View style={styles.container}>
         <Text style={styles.titleText}>
-          Turn on/off button of Flashlight to open Flashlight in RN
+          Share Facebook Post with URL from React Native App
         </Text>
+        <Text style={styles.titleTextsmall}>
+          Enter Post Content
+        </Text>
+        <TextInput
+          value={postContent}
+          onChangeText={
+            (postContent) => setPostContent(postContent)
+          }
+          placeholder={'Enter Facebook Post Content'}
+          style={styles.textInput}
+        />
+        <Text style={styles.titleTextsmall}>
+          Enter URL to Share
+        </Text>
+        <TextInput
+          value={facebookShareURL}
+          onChangeText={(facebookShareURL) =>
+            setFacebookShareURL(facebookShareURL)
+          }
+          placeholder={'Enter URL to Share'}
+          style={styles.textInput}
+        />
         <TouchableOpacity
           activeOpacity={0.7}
           style={styles.buttonStyle}
-          onPress={handlePress}>
+          onPress={postOnFacebook}>
           <Text style={styles.buttonTextStyle}>
-            {isTorchOn ? 'Turn off the Torch' : 'Turn on the Torch'}
+            Share on Facebook
           </Text>
         </TouchableOpacity>
       </View>
@@ -42,12 +84,16 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'white',
     padding: 10,
-    justifyContent: 'center',
+    textAlign: 'center',
   },
   titleText: {
     fontSize: 22,
     textAlign: 'center',
     fontWeight: 'bold',
+  },
+  titleTextsmall: {
+    marginVertical: 8,
+    fontSize: 16,
   },
   buttonStyle: {
     justifyContent: 'center',
@@ -60,5 +106,12 @@ const styles = StyleSheet.create({
   buttonTextStyle: {
     color: '#fff',
     textAlign: 'center',
+  },
+  textInput: {
+    height: 40,
+    borderColor: 'gray',
+    borderWidth: 1,
+    width: '100%',
+    paddingHorizontal: 10,
   },
 });
