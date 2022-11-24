@@ -1,94 +1,229 @@
-import React,{useState,useEffect} from "react";
-import { View,StyleSheet,Text,FlatList,Image, ActivityIndicator } from 'react-native';
-
+import React, {useState, useEffect} from 'react';
+import {
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+  FlatList,
+  TextInput,
+  Keyboard,
+  TouchableOpacity,
+} from 'react-native';
+import Slider from '@react-native-community/slider';
+import Tts from 'react-native-tts';
+ 
 const App = () => {
-
-const [data,setData] = useState([]);
-const [isLoading,setIsLoading] = useState(false);
-const [pageCurrent,setPageCurrent] = useState(1);
-
-useEffect(() => {
-  console.log("useeffect")
-  console.log("useeffect pagecurrent",pageCurrent)
-  setIsLoading(true)
-  this.getData()
-  return () => {
-
-  }
-},[pageCurrent])
-
-getData = async () => {
-  console.log("getData")
-  const apiURL = "https://jsonplaceholder.typicode.com/photos?_limit=10&_page=1" + pageCurrent
-  fetch(apiURL).then((res) => res.json())
-  .then((resJson) => {
-    setData(data.concat(resJson))
-    setIsLoading(false)
-  })
-}
-
-renderItem = ({item}) => {
+  const [voices, setVoices] = useState([]);
+  const [ttsStatus, setTtsStatus] = useState('initiliazing');
+  const [selectedVoice, setSelectedVoice] = useState(null);
+  const [speechRate, setSpeechRate] = useState(0.5);
+  const [speechPitch, setSpeechPitch] = useState(1);
+  const [
+    text,
+    setText
+  ] = useState('Hello React');
+ 
+  useEffect(() => {
+    Tts.addEventListener(
+      'tts-start',
+      (_event) => setTtsStatus('started')
+    );
+    Tts.addEventListener(
+      'tts-finish',
+      (_event) => setTtsStatus('finished')
+    );
+    Tts.addEventListener(
+      'tts-cancel',
+      (_event) => setTtsStatus('cancelled')
+    );
+    Tts.setDefaultRate(speechRate);
+    Tts.setDefaultPitch(speechPitch);
+    Tts.getInitStatus().then(initTts);
+    return () => {
+      Tts.removeEventListener(
+        'tts-start',
+        (_event) => setTtsStatus('started')
+      );
+      Tts.removeEventListener(
+        'tts-finish',
+        (_event) => setTtsStatus('finished'),
+      );
+      Tts.removeEventListener(
+        'tts-cancel',
+        (_event) => setTtsStatus('cancelled'),
+      );
+    };
+  }, []);
+ 
+  const initTts = async () => {
+    const voices = await Tts.voices();
+    const availableVoices = voices
+      .filter((v) => !v.networkConnectionRequired && !v.notInstalled)
+      .map((v) => {
+        return {id: v.id, name: v.name, language: v.language};
+      });
+    let selectedVoice = null;
+    if (voices && voices.length > 0) {
+      selectedVoice = voices[0].id;
+      try {
+        await Tts.setDefaultLanguage(voices[0].language);
+      } catch (err) {
+        console.log(`setDefaultLanguage error `, err);
+      }
+      await Tts.setDefaultVoice(voices[0].id);
+      setVoices(availableVoices);
+      setSelectedVoice(selectedVoice);
+      setTtsStatus('initialized');
+    } else {
+      setTtsStatus('initialized');
+    }
+  };
+ 
+  const readText = async () => {
+    Tts.stop();
+    Tts.speak(text);
+  };
+ 
+  const updateSpeechRate = async (rate) => {
+    await Tts.setDefaultRate(rate);
+    setSpeechRate(rate);
+  };
+ 
+  const updateSpeechPitch = async (rate) => {
+    await Tts.setDefaultPitch(rate);
+    setSpeechPitch(rate);
+  };
+ 
+  const onVoicePress = async (voice) => {
+    try {
+      await Tts.setDefaultLanguage(voice.language);
+    } catch (err) {
+ 
+      console.log(`setDefaultLanguage error `, err);
+    }
+    await Tts.setDefaultVoice(voice.id);
+    setSelectedVoice(voice.id);
+  };
+ 
+  const renderVoiceItem = ({item}) => {
+    return (
+      <TouchableOpacity
+        style={{
+          backgroundColor: selectedVoice === item.id ? 
+          '#DDA0DD' : '#5F9EA0',
+        }}
+        onPress={() => onVoicePress(item)}>
+        <Text style={styles.buttonTextStyle}>
+          {`${item.language} - ${item.name || item.id}`}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+ 
   return (
-    <View style={styles.itemRow}>
-      <Image source={{uri:item.url}} style={styles.itemImage}/>
-      <Text style={styles.itemText}>{item.title}</Text>
-      <Text style={styles.itemText}>{item.id}</Text>
-    </View>
-  )
-}
-
-renderFooter = () => {
-  return (
-    isLoading ? 
-    <View style={styles.loader}>
-      <ActivityIndicator size="large"/>
-    </View>:null
-  )
-}
-
-handleLoadMore = () => {
-  console.log("handleLoadMore")
-  setPageCurrent(pageCurrent + 1)
-  setIsLoading(true)
-}
-
-  return (
-    <FlatList
-    style={styles.container}
-    data={data}
-    renderItem={this.renderItem}
-    keyExtractor={(item,index) =>index.toString()}
-    ListFooterComponent={this.renderFooter}
-    onEndReached={this.handleLoadMore}
-    onEndReachedThreshold={0}
-    />
-  )
-}
-
+    <SafeAreaView style={styles.container}>
+      <View style={styles.container}>
+        <Text style={styles.titleText}>
+          Text to Speech Conversion in React Native
+        </Text>
+        <View style={styles.sliderContainer}>
+          <Text style={styles.sliderLabel}>
+            {`Speed: ${speechRate.toFixed(2)}`}
+          </Text>
+          <Slider
+            style={styles.slider}
+            minimumValue={0.01}
+            maximumValue={0.99}
+            value={speechRate}
+            onSlidingComplete={updateSpeechRate}
+          />
+        </View>
+        <View style={styles.sliderContainer}>
+          <Text style={styles.sliderLabel}>
+            {`Pitch: ${speechPitch.toFixed(2)}`}
+          </Text>
+          <Slider
+            style={styles.slider}
+            minimumValue={0.5}
+            maximumValue={2}
+            value={speechPitch}
+            onSlidingComplete={updateSpeechPitch}
+          />
+        </View>
+        <Text style={styles.sliderContainer}>
+          {`Selected Voice: ${selectedVoice || ''}`}
+        </Text>
+        <TextInput
+          style={styles.textInput}
+          onChangeText={(text) => setText(text)}
+          value={text}
+          onSubmitEditing={Keyboard.dismiss}
+        />
+        <TouchableOpacity
+          style={styles.buttonStyle}
+          onPress={readText}>
+          <Text style={styles.buttonTextStyle}>
+            Click to Read Text ({`Status: ${ttsStatus || ''}`})
+          </Text>
+        </TouchableOpacity>
+        <Text style={styles.sliderLabel}>
+          Select the Voice from below
+        </Text>
+        <FlatList
+          style={{width: '100%', marginTop: 5}}
+          keyExtractor={(item) => item.id}
+          renderItem={renderVoiceItem}
+          extraData={selectedVoice}
+          data={voices}
+        />
+      </View>
+    </SafeAreaView>
+  );
+};
+ 
 export default App;
-
+ 
 const styles = StyleSheet.create({
   container: {
-    marginTop:20,
-    backgroundColor:'#f5fcff'
+    flex: 1,
+    flexDirection: 'column',
+    padding: 5,
   },
-  itemRow:{
-    borderBottomColor:'#ccc',
-    marginBottom:10,
-    borderBottomWidth:1
+  titleText: {
+    fontSize: 22,
+    textAlign: 'center',
+    fontWeight: 'bold',
   },
-  itemImage:{
-    width:'100%',
-    height:200,
-    resizeMode:'cover'
+  buttonStyle: {
+    justifyContent: 'center',
+    marginTop: 15,
+    padding: 10,
+    backgroundColor: '#8ad24e',
   },
-  itemText:{
-    fontSize:16,
-    padding:5
+  buttonTextStyle: {
+    color: '#fff',
+    textAlign: 'center',
   },
-  loader:{
-    marginTop:10,
-    alignItems:'center'
-  }
-})
-
+  sliderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 300,
+    padding: 5,
+  },
+  sliderLabel: {
+    textAlign: 'center',
+    marginRight: 20,
+  },
+  slider: {
+    flex: 1,
+  },
+  textInput: {
+    borderColor: 'gray',
+    borderWidth: 1,
+    color: 'black',
+    width: '100%',
+    textAlign: 'center',
+    height: 40,
+  },
+});
